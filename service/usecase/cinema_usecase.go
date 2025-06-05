@@ -1,10 +1,10 @@
 package usecase
 
 import (
+	"cinema-seat-reservation/service/cinema_service"
+	"cinema-seat-reservation/service/model/request"
+	"cinema-seat-reservation/service/model/response"
 	"errors"
-	"home-assignment/home-assignments/service/cinema_service"
-	"home-assignment/home-assignments/service/model/request"
-	"home-assignment/home-assignments/service/model/response"
 	"sync"
 )
 

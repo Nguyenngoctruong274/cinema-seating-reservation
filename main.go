@@ -1,10 +1,10 @@
 package main
 
 import (
+	"cinema-seat-reservation/service/cinema_service"
+	"cinema-seat-reservation/service/handler"
+	"cinema-seat-reservation/service/usecase"
 	"github.com/gin-gonic/gin"
-	"home-assignment/home-assignments/service/cinema_service"
-	"home-assignment/home-assignments/service/handler"
-	"home-assignment/home-assignments/service/usecase"
 )
 
 func main() {

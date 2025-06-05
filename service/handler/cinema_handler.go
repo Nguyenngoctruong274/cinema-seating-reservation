@@ -1,10 +1,10 @@
 package handler
 
 import (
+	"cinema-seat-reservation/service/model/request"
+	"cinema-seat-reservation/service/usecase"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"home-assignment/home-assignments/service/model/request"
-	"home-assignment/home-assignments/service/usecase"
 	"net/http"
 	"strconv"
 )
@@ -51,7 +51,7 @@ func (h *cinemaHandler) QueryAvailableSeats(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "request cannot be empty"})
 		return
 	}
-	
+
 	data := h.CinemaUseCase.QueryAvailableSeats(request.QueryAvailableSeatRequest{Count: seat})
 
 	c.JSON(http.StatusOK, gin.H{"data": data})

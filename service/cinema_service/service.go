@@ -1,7 +1,7 @@
 package cinema_service
 
 import (
-	"home-assignment/home-assignments/service/model/request"
+	"cinema-seat-reservation/service/model/request"
 	"sync"
 )
 
