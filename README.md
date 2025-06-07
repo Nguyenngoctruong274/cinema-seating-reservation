@@ -35,7 +35,8 @@ It provides RESTful APIs :
 5. **Test the Endpoints**:
     You can use the provided endpoints to interact with the system. The main endpoints include:
     - `POST /cinema/configure`: Configure cinema layout
-    - `GET /cinema/available-seats`: Get available seats
+    - `GET  /cinema/available-seats`: Get available seats
+    - `POST /cinema/check-available`: Check available seats
     - `POST /cinema/reserve`: Reserve seats
     - `POST /cinema/cancel`: Cancel reservations
  Use tools like Postman or cURL to test the API endpoints or go test ./... -v
