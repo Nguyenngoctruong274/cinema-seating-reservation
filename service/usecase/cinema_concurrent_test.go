@@ -1,9 +1,9 @@
 package usecase
 
 import (
+	"cinema-seat-reservation/service/cinema_service"
+	"cinema-seat-reservation/service/model/request"
 	"github.com/stretchr/testify/assert"
-	"home-assignment/home-assignments/service/cinema_service"
-	"home-assignment/home-assignments/service/model/request"
 	"sync"
 	"testing"
 )
