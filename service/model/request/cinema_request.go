@@ -3,8 +3,8 @@ package request
 type Seat struct {
 	Row    int  `json:"row" required:"true"`
 	Column int  `json:"column" required:"true"`
-	Taken  bool `json:"-"`
-	Group  int  `json:"-"`
+	Taken  bool `json:"taken"`
+	Group  int  `json:"group"`
 }
 
 type ConfigRequest struct {

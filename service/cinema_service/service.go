@@ -2,6 +2,8 @@ package cinema_service
 
 import (
 	"cinema-seat-reservation/service/model/request"
+	"encoding/json"
+	"os"
 	"sync"
 )
 
@@ -34,4 +36,67 @@ func (s *CinemaService) Configure(rows, cols, minDist int) {
 		}
 	}
 	s.GroupCounter = 0
+}
+
+func (s *CinemaService) SaveDataCinema(filename string) error {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	type State struct {
+		Rows         int
+		Cols         int
+		MinDistance  int
+		Seats        [][]*request.Seat
+		GroupCounter int
+	}
+
+	if s.Rows == 0 || s.Cols == 0 {
+		return nil // Không có dữ liệu để lưu
+	}
+
+	state := State{
+		Rows:         s.Rows,
+		Cols:         s.Cols,
+		MinDistance:  s.MinDistance,
+		Seats:        s.Seats,
+		GroupCounter: s.GroupCounter,
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filename, data, 0644)
+}
+
+func (s *CinemaService) LoadSaveDataCinema(filename string) error {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	type State struct {
+		Rows         int
+		Cols         int
+		MinDistance  int
+		Seats        [][]*request.Seat
+		GroupCounter int
+	}
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	var state State
+	if err = json.Unmarshal(data, &state); err != nil {
+		return err
+	}
+	s.Rows = state.Rows
+	s.Cols = state.Cols
+	s.MinDistance = state.MinDistance
+	s.Seats = state.Seats
+	s.GroupCounter = state.GroupCounter
+	// Khởi tạo lại SeatLocks
+	s.SeatLocks = make([][]*sync.Mutex, s.Rows)
+	for i := 0; i < s.Rows; i++ {
+		s.SeatLocks[i] = make([]*sync.Mutex, s.Cols)
+		for j := 0; j < s.Cols; j++ {
+			s.SeatLocks[i][j] = &sync.Mutex{}
+		}
+	}
+	return nil
 }
