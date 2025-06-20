@@ -1,10 +1,10 @@
 package response
 
 type Seat struct {
-	Row    int  `json:"row"`
-	Column int  `json:"column"`
-	Taken  bool `json:"-"`
-	Group  int  `json:"-"`
+	Row    int    `json:"row"`
+	Column int    `json:"column"`
+	Taken  bool   `json:"-"`
+	Group  uint64 `json:"-"`
 }
 
 type CheckAvailableSeatResp struct {

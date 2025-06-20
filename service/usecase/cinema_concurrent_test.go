@@ -65,7 +65,7 @@ func TestCinemaService_HighConcurrencyWithWorkerPool(t *testing.T) {
 	}
 	svc.Configure(req)
 
-	jobChan := make(chan ReserveJob, 2000)
+	jobChan := make(chan ReserveJob, 200000)
 	workerCount := 10
 
 	// Launch worker pool

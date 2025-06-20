@@ -13,7 +13,7 @@ type CinemaService struct {
 	MinDistance  int
 	Seats        [][]*request.Seat
 	SeatLocks    [][]*sync.Mutex
-	GroupCounter int
+	GroupCounter uint64
 	Mu           sync.Mutex
 }
 
@@ -46,7 +46,7 @@ func (s *CinemaService) SaveDataCinema(filename string) error {
 		Cols         int
 		MinDistance  int
 		Seats        [][]*request.Seat
-		GroupCounter int
+		GroupCounter uint64
 	}
 
 	if s.Rows == 0 || s.Cols == 0 {
@@ -75,7 +75,7 @@ func (s *CinemaService) LoadSaveDataCinema(filename string) error {
 		Cols         int
 		MinDistance  int
 		Seats        [][]*request.Seat
-		GroupCounter int
+		GroupCounter uint64
 	}
 	data, err := os.ReadFile(filename)
 	if err != nil {

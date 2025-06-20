@@ -6,6 +6,7 @@ import (
 	"cinema-seat-reservation/service/model/response"
 	"errors"
 	"sync"
+	"sync/atomic"
 )
 
 type CinemaServiceUseCase interface {
@@ -116,10 +117,7 @@ func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) erro
 		}
 	}
 
-	s.cs.Mu.Lock()
-	s.cs.GroupCounter++
-	groupID := s.cs.GroupCounter
-	s.cs.Mu.Unlock()
+	groupID := atomic.AddUint64(&s.cs.GroupCounter, 1)
 
 	for _, c := range seats {
 		seat := s.cs.Seats[c.Row][c.Column]

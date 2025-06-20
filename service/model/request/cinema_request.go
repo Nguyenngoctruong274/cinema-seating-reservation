@@ -1,10 +1,10 @@
 package request
 
 type Seat struct {
-	Row    int  `json:"row" required:"true"`
-	Column int  `json:"column" required:"true"`
-	Taken  bool `json:"taken"`
-	Group  int  `json:"group"`
+	Row    int    `json:"row" required:"true"`
+	Column int    `json:"column" required:"true"`
+	Taken  bool   `json:"taken"`
+	Group  uint64 `json:"group"`
 }
 
 type ConfigRequest struct {
