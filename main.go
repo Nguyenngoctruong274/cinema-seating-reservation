@@ -20,6 +20,7 @@ func main() {
 	if err := cinemaService.LoadSaveDataCinema(stateFile); err != nil && !os.IsNotExist(err) {
 		log.Fatalf("Failed to load state: %v", err)
 	}
+
 	// Wrap with panic recovery
 	defer func() {
 		if re := recover(); re != nil {

@@ -28,11 +28,12 @@ func NewCinemaHandler(cinemaUsecase usecase.CinemaServiceUseCase) CinemaHandler 
 func (h *cinemaHandler) Configure(c *gin.Context) {
 	req := request.ConfigRequest{}
 	validate := validator.New()
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
+	
 	if err := validate.Struct(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "validation failed", "details": err.Error()})
 		return
