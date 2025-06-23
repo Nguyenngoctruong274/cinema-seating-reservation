@@ -4,7 +4,8 @@ import (
 	"cinema-seat-reservation/service/cinema_service"
 	"cinema-seat-reservation/service/model/request"
 	"cinema-seat-reservation/service/model/response"
-	"errors"
+	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 )
@@ -13,7 +14,7 @@ type CinemaServiceUseCase interface {
 	Configure(req request.ConfigRequest)
 	QueryAvailableSeats(req request.QueryAvailableSeatRequest) response.QueryAvailableSeatResp
 	CheckAvailableSeats(req request.CheckAvailableSeatRequest) response.CheckAvailableSeatResp
-	ReserveSeats(req request.ReserveSeatRequest) error
+	ReserveSeats(req request.ReserveSeatRequest) (response.ReserveSeatsResp, error)
 	CancelSeats(req request.CancelSeatRequest) error
 }
 
@@ -89,14 +90,24 @@ func (s *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSea
 }
 
 // Reserve Seats
-func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) error {
+func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) (response.ReserveSeatsResp, error) {
 	seats := req.Seats
-	locks := make([]*sync.Mutex, len(seats))
 	// Lock all seats in order
-	for i, c := range seats {
+	for _, c := range seats {
 		if c.Row >= s.cs.Rows || c.Column >= s.cs.Cols {
-			return errors.New("seat out of bounds")
+			return response.ReserveSeatsResp{}, fmt.Errorf("seat at row %d, column %d is out of bounds", c.Row, c.Column)
 		}
+	}
+	// Sort seats by row and column to avoid deadlocks
+	sort.Slice(seats, func(i, j int) bool {
+		if seats[i].Row == seats[j].Row {
+			return seats[i].Column < seats[j].Column
+		}
+		return seats[i].Row < seats[j].Row
+	})
+
+	locks := make([]*sync.Mutex, len(seats))
+	for i, c := range seats {
 		locks[i] = s.cs.SeatLocks[c.Row][c.Column]
 	}
 
@@ -113,7 +124,7 @@ func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) erro
 	for _, c := range seats {
 		seat := s.cs.Seats[c.Row][c.Column]
 		if seat.Taken || !s.validDistance(c.Row, c.Column) {
-			return errors.New("seat unavailable or violates distance")
+			return response.ReserveSeatsResp{}, fmt.Errorf("seat at row %d, column %d is already taken or too close to another seat", c.Row, c.Column)
 		}
 	}
 
@@ -125,7 +136,9 @@ func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) erro
 		seat.Group = groupID
 	}
 
-	return nil
+	return response.ReserveSeatsResp{
+		Message: "Seats reserved successfully",
+	}, nil
 }
 
 // Cancel Reservation

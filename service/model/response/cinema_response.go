@@ -14,3 +14,7 @@ type CheckAvailableSeatResp struct {
 type QueryAvailableSeatResp struct {
 	AvailableSeats [][]Seat `json:"available_seats"`
 }
+
+type ReserveSeatsResp struct {
+	Message string `json:"message"`
+}
