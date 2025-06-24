@@ -68,19 +68,19 @@ func (s *cinemaServiceUsecase) QueryAvailableSeats(req request.QueryAvailableSea
 func (c *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSeatRequest) (result response.CheckAvailableSeatResp) {
 
 	seatsCheck := req.Seats
-	seatLocks := make([]*sync.Mutex, 0, len(seatsCheck))
+	seatLocks := make([]*sync.RWMutex, 0, len(seatsCheck))
 	for _, seat := range seatsCheck {
-		if seat.Column > c.cs.Cols || seat.Row > c.cs.Cols {
+		if seat.Column >= c.cs.Cols || seat.Row >= c.cs.Cols {
 			continue
 		}
 		seatLock := c.cs.SeatLocks[seat.Row][seat.Column]
-		seatLock.Lock()
+		seatLock.RLock()
 		seatLocks = append(seatLocks, seatLock)
 	}
 
 	defer func() {
 		for _, seatLock := range seatLocks {
-			seatLock.Unlock()
+			seatLock.RUnlock()
 		}
 	}()
 
@@ -118,12 +118,9 @@ func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) (res
 		return seats[i].Row < seats[j].Row
 	})
 
-	locks := make([]*sync.Mutex, len(seats))
+	locks := make([]*sync.RWMutex, len(seats))
 	for i, c := range seats {
 		locks[i] = s.cs.SeatLocks[c.Row][c.Column]
-	}
-
-	for i := range locks {
 		locks[i].Lock()
 	}
 
@@ -157,13 +154,30 @@ func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) (res
 func (s *cinemaServiceUsecase) CancelSeats(req request.CancelSeatRequest) error {
 
 	coords := req.Seats
-	for _, c := range coords {
-		if c.Row < s.cs.Rows && c.Column < s.cs.Cols {
-			s.cs.SeatLocks[c.Row][c.Column].Lock()
-			s.cs.Seats[c.Row][c.Column].Taken = false
-			s.cs.Seats[c.Row][c.Column].Group = 0
-			s.cs.SeatLocks[c.Row][c.Column].Unlock()
+	sort.Slice(coords, func(i, j int) bool {
+		if coords[i].Row == coords[j].Row {
+			return coords[i].Column < coords[j].Column
 		}
+		return coords[i].Row < coords[j].Row
+	})
+
+	locks := make([]*sync.RWMutex, 0, len(coords))
+	for _, c := range coords {
+		if c.Row >= s.cs.Rows || c.Column >= s.cs.Cols {
+			continue
+		}
+		lock := s.cs.SeatLocks[c.Row][c.Column]
+		lock.Lock()
+		locks = append(locks, lock)
+
+		seat := s.cs.Seats[c.Row][c.Column]
+		seat.Taken = false
+		seat.Group = 0
+	}
+
+	// Unlock all (có thể theo chiều ngược lại để chắc ăn)
+	for i := len(locks) - 1; i >= 0; i-- {
+		locks[i].Unlock()
 	}
 
 	return nil

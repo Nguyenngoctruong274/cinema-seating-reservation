@@ -12,7 +12,7 @@ type CinemaService struct {
 	Cols         int
 	MinDistance  int
 	Seats        [][]*request.Seat
-	SeatLocks    [][]*sync.Mutex
+	SeatLocks    [][]*sync.RWMutex
 	GroupCounter uint64
 	Mu           sync.Mutex
 }
@@ -26,13 +26,13 @@ func (s *CinemaService) Configure(rows, cols, minDist int) {
 	defer s.Mu.Unlock()
 	s.Rows, s.Cols, s.MinDistance = rows, cols, minDist
 	s.Seats = make([][]*request.Seat, rows)
-	s.SeatLocks = make([][]*sync.Mutex, rows)
+	s.SeatLocks = make([][]*sync.RWMutex, rows)
 	for i := range s.Seats {
 		s.Seats[i] = make([]*request.Seat, cols)
-		s.SeatLocks[i] = make([]*sync.Mutex, cols)
+		s.SeatLocks[i] = make([]*sync.RWMutex, cols)
 		for j := 0; j < cols; j++ {
 			s.Seats[i][j] = &request.Seat{Row: i, Column: j}
-			s.SeatLocks[i][j] = &sync.Mutex{}
+			s.SeatLocks[i][j] = &sync.RWMutex{}
 		}
 	}
 	s.GroupCounter = 0
@@ -91,11 +91,11 @@ func (s *CinemaService) LoadSaveDataCinema(filename string) error {
 	s.Seats = state.Seats
 	s.GroupCounter = state.GroupCounter
 	// Khởi tạo lại SeatLocks
-	s.SeatLocks = make([][]*sync.Mutex, s.Rows)
+	s.SeatLocks = make([][]*sync.RWMutex, s.Rows)
 	for i := 0; i < s.Rows; i++ {
-		s.SeatLocks[i] = make([]*sync.Mutex, s.Cols)
+		s.SeatLocks[i] = make([]*sync.RWMutex, s.Cols)
 		for j := 0; j < s.Cols; j++ {
-			s.SeatLocks[i][j] = &sync.Mutex{}
+			s.SeatLocks[i][j] = &sync.RWMutex{}
 		}
 	}
 	return nil
