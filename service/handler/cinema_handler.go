@@ -33,7 +33,7 @@ func (h *cinemaHandler) Configure(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	if err := validate.Struct(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "validation failed", "details": err.Error()})
 		return
@@ -89,12 +89,13 @@ func (h *cinemaHandler) ReserveSeats(c *gin.Context) {
 		return
 	}
 
-	if err := h.CinemaUseCase.ReserveSeats(req); err != nil {
+	data, err := h.CinemaUseCase.ReserveSeats(req)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK})
+	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
 func (h *cinemaHandler) CancelSeats(c *gin.Context) {
