@@ -65,28 +65,40 @@ func (s *cinemaServiceUsecase) QueryAvailableSeats(req request.QueryAvailableSea
 }
 
 // Check Available Seats
-func (s *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSeatRequest) (available response.CheckAvailableSeatResp) {
+func (c *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSeatRequest) (result response.CheckAvailableSeatResp) {
 
-	seats := req.Seats
+	seatsCheck := req.Seats
+	seatLocks := make([]*sync.Mutex, 0, len(seatsCheck))
+	for _, seat := range seatsCheck {
+		if seat.Column > c.cs.Cols || seat.Row > c.cs.Cols {
+			continue
+		}
+		seatLock := c.cs.SeatLocks[seat.Row][seat.Column]
+		seatLock.Lock()
+		seatLocks = append(seatLocks, seatLock)
+	}
 
-	for _, c := range seats {
-		if c.Row < s.cs.Rows && c.Column < s.cs.Cols {
-			//&& !s.cs.Seats[c.Row][c.Column].Taken {
-			lock := s.cs.SeatLocks[c.Row][c.Column]
-			lock.Lock()
-			if !s.cs.Seats[c.Row][c.Column].Taken {
-				seat := *s.cs.Seats[c.Row][c.Column]
-				available.AvailableSeats = append(available.AvailableSeats, response.Seat{
-					Row:    seat.Row,
-					Column: seat.Column,
-					Taken:  seat.Taken,
-					Group:  seat.Group,
+	defer func() {
+		for _, seatLock := range seatLocks {
+			seatLock.Unlock()
+		}
+	}()
+
+	for _, seat := range seatsCheck {
+		if seat.Row < c.cs.Rows && seat.Column < c.cs.Cols {
+			seatValid := c.cs.Seats[seat.Row][seat.Column]
+			if !seatValid.Taken {
+				result.AvailableSeats = append(result.AvailableSeats, response.Seat{
+					Row:    seatValid.Row,
+					Column: seatValid.Column,
+					Taken:  seatValid.Taken,
+					Group:  seatValid.Group,
 				})
 			}
-			lock.Unlock()
 		}
 	}
-	return available
+
+	return result
 }
 
 // Reserve Seats
