@@ -20,11 +20,11 @@ func TestCinemaService_AllSeatsReserved(t *testing.T) {
 	req := request.ReserveSeatRequest{
 		Seats: []request.Seat{{Row: 0, Column: 0}, {Row: 0, Column: 1}},
 	}
-	err := svc.ReserveSeats(req)
+	_, err := svc.ReserveSeats(req)
 	assert.NoError(t, err)
 
 	// Try to reserve again
-	err = svc.ReserveSeats(req)
+	_, err = svc.ReserveSeats(req)
 	assert.Error(t, err, "Should fail because all seats are reserved")
 }
 
@@ -46,8 +46,8 @@ func TestCinemaService_OverlappingRequests(t *testing.T) {
 		Seats: []request.Seat{{Row: 0, Column: 1}, {Row: 0, Column: 2}},
 	}
 
-	err1 := svc.ReserveSeats(first)
-	err2 := svc.ReserveSeats(second)
+	_, err1 := svc.ReserveSeats(first)
+	_, err2 := svc.ReserveSeats(second)
 
 	assert.NoError(t, err1)
 	assert.Error(t, err2, "Overlapping seat should fail")
@@ -67,7 +67,7 @@ func TestCinemaService_InvalidCoordinates(t *testing.T) {
 		Seats: []request.Seat{{Row: 5, Column: 5}},
 	}
 
-	err := svc.ReserveSeats(invalid)
+	_, err := svc.ReserveSeats(invalid)
 	assert.Error(t, err, "Should fail due to out-of-bounds seat")
 }
 
@@ -85,6 +85,6 @@ func TestCinemaService_TooManySeatsRequested(t *testing.T) {
 		Seats: []request.Seat{{Row: 0, Column: 0}, {Row: 0, Column: 1}, {Row: 0, Column: 2}},
 	}
 
-	err := svc.ReserveSeats(tooMany)
+	_, err := svc.ReserveSeats(tooMany)
 	assert.Error(t, err, "Should fail because too many seats are requested")
 }

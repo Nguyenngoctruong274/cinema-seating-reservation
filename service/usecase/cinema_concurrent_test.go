@@ -28,9 +28,10 @@ func TestCinemaService_ConcurrentReservations(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			chanErrs <- svc.ReserveSeats(request.ReserveSeatRequest{
+			_, err := svc.ReserveSeats(request.ReserveSeatRequest{
 				Seats: coords,
 			})
+			chanErrs <- err
 		}(i)
 	}
 
@@ -72,7 +73,7 @@ func TestCinemaService_HighConcurrencyWithWorkerPool(t *testing.T) {
 	for i := 0; i < workerCount; i++ {
 		go func() {
 			for job := range jobChan {
-				err := svc.ReserveSeats(job.Seats)
+				_, err := svc.ReserveSeats(job.Seats)
 				job.Result <- err
 			}
 		}()

@@ -63,7 +63,7 @@ func TestCinemaService_ReserveSeats(t *testing.T) {
 			{Row: 0, Column: 1},
 		},
 	}
-	err := svc.ReserveSeats(result)
+	_, err := svc.ReserveSeats(result)
 	assert.NoError(t, err)
 
 	for _, c := range result.Seats {
@@ -122,5 +122,5 @@ func TestCinemaService_CancelSeats(t *testing.T) {
 	})
 
 	assert.False(t, cinemaService.Seats[0][0].Taken)
-	assert.Equal(t, 0, cinemaService.Seats[0][0].Group)
+	assert.Equal(t, uint64(0), cinemaService.Seats[0][0].Group)
 }
