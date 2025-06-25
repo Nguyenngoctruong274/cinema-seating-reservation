@@ -13,136 +13,161 @@ import (
 type CinemaServiceUseCase interface {
 	Configure(req request.ConfigRequest)
 	QueryAvailableSeats(req request.QueryAvailableSeatRequest) response.QueryAvailableSeatResp
-	CheckAvailableSeats(req request.CheckAvailableSeatRequest) response.CheckAvailableSeatResp
+	CheckAvailableSeats(req request.CheckAvailableSeatRequest) (response.CheckAvailableSeatResp, error)
 	ReserveSeats(req request.ReserveSeatRequest) (response.ReserveSeatsResp, error)
 	CancelSeats(req request.CancelSeatRequest) error
 }
 
 type cinemaServiceUsecase struct {
-	cs *cinema_service.CinemaService
+	cinema *cinema_service.CinemaService
 }
 
 func NewCinemaUsecase(cinemaService *cinema_service.CinemaService) CinemaServiceUseCase {
 	return &cinemaServiceUsecase{
-		cs: cinemaService,
+		cinema: cinemaService,
 	}
 }
 
 // Configure Cinema Layout
-func (s *cinemaServiceUsecase) Configure(req request.ConfigRequest) {
-	s.cs.Configure(req.Rows, req.Columns, req.MinDistance)
+func (c *cinemaServiceUsecase) Configure(req request.ConfigRequest) {
+	c.cinema.Configure(req.Rows, req.Columns, req.MinDistance)
 }
 
 // Query Available Seats
-func (s *cinemaServiceUsecase) QueryAvailableSeats(req request.QueryAvailableSeatRequest) (result response.QueryAvailableSeatResp) {
-
-	count := req.Count
-	for i := 0; i < s.cs.Rows; i++ {
-		for j := 0; j <= s.cs.Cols-count; j++ {
+func (c *cinemaServiceUsecase) QueryAvailableSeats(req request.QueryAvailableSeatRequest) (result response.QueryAvailableSeatResp) {
+	seatCheck := req.Count
+	bookingSet := make(map[[2]int]bool)
+	for i := 0; i < c.cinema.Rows; i++ {
+		for j := 0; j <= c.cinema.Cols-seatCheck; j++ {
 			valid := true
-			block := make([]response.Seat, count)
-			for k := 0; k < count; k++ {
-				seat := s.cs.Seats[i][j+k]
-				if seat.Taken || !s.validDistance(i, j+k) {
+			seatValid := make([]response.Seat, 0, seatCheck)
+			for k := 0; k < seatCheck; k++ {
+				row := i
+				col := j + k
+				seat := c.cinema.Seats[row][col]
+				if seat.Taken || !c.validDistance(seat.Row, seat.Column, bookingSet) {
 					valid = false
 					break
 				}
-				seatReq := *seat
-
-				block[k] = response.Seat{
-					Row:    seatReq.Row,
-					Column: seatReq.Column,
-					Taken:  seatReq.Taken,
-					Group:  seatReq.Group,
-				}
+				seatValid = append(seatValid, response.Seat{
+					Row:    seat.Row,
+					Column: seat.Column,
+					Taken:  seat.Taken,
+					Group:  seat.Group,
+				})
 			}
 			if valid {
-				result.AvailableSeats = append(result.AvailableSeats, block)
+				result.AvailableSeats = append(result.AvailableSeats, seatValid)
 			}
 		}
 	}
-	return result
+	return
 }
 
 // Check Available Seats
-func (c *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSeatRequest) (result response.CheckAvailableSeatResp) {
-
-	seatsCheck := req.Seats
-	seatLocks := make([]*sync.RWMutex, 0, len(seatsCheck))
-	for _, seat := range seatsCheck {
-		if seat.Column >= c.cs.Cols || seat.Row >= c.cs.Cols {
-			continue
+func (c *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSeatRequest) (result response.CheckAvailableSeatResp, err error) {
+	seatChecks := req.Seats
+	seatLocks := make([]*sync.RWMutex, 0, len(seatChecks))
+	mapSeatUnique := make(map[[2]int]bool)
+	for _, seat := range seatChecks {
+		if seat.Row >= c.cinema.Rows || seat.Column >= seat.Column {
+			return response.CheckAvailableSeatResp{}, fmt.Errorf("seat (%d,%d) out of bounds", seat.Row, seat.Column)
 		}
-		seatLock := c.cs.SeatLocks[seat.Row][seat.Column]
-		seatLock.RLock()
-		seatLocks = append(seatLocks, seatLock)
+		key := [2]int{seat.Row, seat.Row}
+		if mapSeatUnique[key] {
+			return response.CheckAvailableSeatResp{}, fmt.Errorf("duplicate seat (%d,%d) in request", seat.Row, seat.Column)
+		}
+		mapSeatUnique[key] = true
 	}
 
+	sort.Slice(seatChecks, func(i, j int) bool {
+		if seatChecks[i].Row == seatChecks[j].Row {
+			return seatChecks[i].Column < seatChecks[j].Column
+		}
+		return seatChecks[i].Row < seatChecks[j].Row
+	})
+
+	for _, seat := range seatChecks {
+		if seat.Row >= c.cinema.Rows || seat.Column >= c.cinema.Cols {
+			continue
+		}
+		seatLock := c.cinema.SeatLocks[seat.Row][seat.Column]
+		seatLock.RLock()
+		seatLocks = append(seatLocks, seatLock)
+		seatValid := c.cinema.Seats[seat.Row][seat.Column]
+		if !seatValid.Taken {
+			result.AvailableSeats = append(result.AvailableSeats, response.Seat{
+				Row:    seatValid.Row,
+				Column: seatValid.Column,
+				Taken:  false,
+				Group:  seatValid.Group,
+			})
+		}
+	}
+
+	//unlock
 	defer func() {
-		for _, seatLock := range seatLocks {
-			seatLock.RUnlock()
+		for i := len(seatLocks) - 1; i >= 0; i-- {
+			seatLocks[i].RUnlock()
 		}
 	}()
 
-	for _, seat := range seatsCheck {
-		if seat.Row < c.cs.Rows && seat.Column < c.cs.Cols {
-			seatValid := c.cs.Seats[seat.Row][seat.Column]
-			if !seatValid.Taken {
-				result.AvailableSeats = append(result.AvailableSeats, response.Seat{
-					Row:    seatValid.Row,
-					Column: seatValid.Column,
-					Taken:  seatValid.Taken,
-					Group:  seatValid.Group,
-				})
-			}
-		}
-	}
-
-	return result
+	return
 }
 
 // Reserve Seats
-func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) (response.ReserveSeatsResp, error) {
-	seats := req.Seats
-	// Lock all seats in order
-	for _, c := range seats {
-		if c.Row >= s.cs.Rows || c.Column >= s.cs.Cols {
-			return response.ReserveSeatsResp{}, fmt.Errorf("seat at row %d, column %d is out of bounds", c.Row, c.Column)
+func (c *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) (response.ReserveSeatsResp, error) {
+	bookSeats := req.Seats
+	//1. check validate seat
+	mapSeatUnique := make(map[[2]int]bool)
+
+	for _, seat := range bookSeats {
+		if seat.Row >= c.cinema.Rows || seat.Column >= c.cinema.Cols {
+			return response.ReserveSeatsResp{}, fmt.Errorf("seat (%d,%d) out of bounds", seat.Row, seat.Column)
 		}
+		key := [2]int{seat.Row, seat.Column}
+		if mapSeatUnique[key] {
+			return response.ReserveSeatsResp{}, fmt.Errorf("duplicate seat (%d,%d) in requests", seat.Row, seat.Column)
+		}
+		mapSeatUnique[key] = true
 	}
-	// Sort seats by row and column to avoid deadlocks
-	sort.Slice(seats, func(i, j int) bool {
-		if seats[i].Row == seats[j].Row {
-			return seats[i].Column < seats[j].Column
+
+	//2. sort avoid deadlocks
+	sort.Slice(bookSeats, func(i, j int) bool {
+		if bookSeats[i].Row == bookSeats[j].Row {
+			return bookSeats[i].Column < bookSeats[j].Column
 		}
-		return seats[i].Row < seats[j].Row
+		return bookSeats[i].Row < bookSeats[j].Row
 	})
 
-	locks := make([]*sync.RWMutex, len(seats))
-	for i, c := range seats {
-		locks[i] = s.cs.SeatLocks[c.Row][c.Column]
-		locks[i].Lock()
+	//3. lock
+	seatLocks := make([]*sync.RWMutex, 0, len(bookSeats))
+	for _, seat := range bookSeats {
+		if seat.Row < c.cinema.Rows && seat.Column < c.cinema.Cols {
+			seatLock := c.cinema.SeatLocks[seat.Row][seat.Column]
+			seatLock.Lock()
+			seatLocks = append(seatLocks, seatLock)
+		}
 	}
 
 	defer func() {
-		for i := range locks {
-			locks[i].Unlock()
+		for i := len(seatLocks) - 1; i >= 0; i-- {
+			seatLocks[i].Unlock()
 		}
 	}()
 
-	for _, c := range seats {
-		seat := s.cs.Seats[c.Row][c.Column]
-		if seat.Taken || !s.validDistance(c.Row, c.Column) {
-			return response.ReserveSeatsResp{}, fmt.Errorf("seat at row %d, column %d is already taken or too close to another seat", c.Row, c.Column)
+	//4. Check
+	for _, seat := range bookSeats {
+		if c.cinema.Seats[seat.Row][seat.Column].Taken || !c.validDistance(seat.Row, seat.Column, mapSeatUnique) {
+			return response.ReserveSeatsResp{}, fmt.Errorf("seat (%d,%d) is already taken or to close to another seat", seat.Row, seat.Column)
 		}
 	}
-
-	groupID := atomic.AddUint64(&s.cs.GroupCounter, 1)
-
-	for _, c := range seats {
-		seat := s.cs.Seats[c.Row][c.Column]
-		seat.Taken = true
-		seat.Group = groupID
+	//5. order
+	groupID := atomic.AddUint64(&c.cinema.GroupCounter, 1)
+	for _, seat := range bookSeats {
+		seatValid := c.cinema.Seats[seat.Row][seat.Column]
+		seatValid.Taken = true
+		seatValid.Group = groupID
 	}
 
 	return response.ReserveSeatsResp{
@@ -151,33 +176,48 @@ func (s *cinemaServiceUsecase) ReserveSeats(req request.ReserveSeatRequest) (res
 }
 
 // Cancel Reservation
-func (s *cinemaServiceUsecase) CancelSeats(req request.CancelSeatRequest) error {
-
-	coords := req.Seats
-	sort.Slice(coords, func(i, j int) bool {
-		if coords[i].Row == coords[j].Row {
-			return coords[i].Column < coords[j].Column
+func (c *cinemaServiceUsecase) CancelSeats(req request.CancelSeatRequest) error {
+	seatsCancel := req.Seats
+	mapSeatUnique := make(map[[2]int]bool)
+	//	1.Validate
+	for _, seat := range seatsCancel {
+		if seat.Row >= c.cinema.Rows || seat.Column >= c.cinema.Cols {
+			return fmt.Errorf("seat (%d,%d) out of bounds", seat.Row, seat.Column)
 		}
-		return coords[i].Row < coords[j].Row
+		if mapSeatUnique[[2]int{seat.Row, seat.Column}] {
+			return fmt.Errorf("duplicate seat (%d,%d) in requests", seat.Row, seat.Column)
+		}
+	}
+	//2.sort
+	sort.Slice(seatsCancel, func(i, j int) bool {
+		if seatsCancel[i].Row == seatsCancel[j].Row {
+			return seatsCancel[i].Column < seatsCancel[i].Column
+		}
+		return seatsCancel[i].Row < seatsCancel[j].Row
 	})
-
-	locks := make([]*sync.RWMutex, 0, len(coords))
-	for _, c := range coords {
-		if c.Row >= s.cs.Rows || c.Column >= s.cs.Cols {
-			continue
+	//3. lock
+	seatLocks := make([]*sync.RWMutex, 0, len(seatsCancel))
+	for _, seat := range seatsCancel {
+		if seat.Row < c.cinema.Rows && seat.Column < c.cinema.Cols {
+			seatLock := c.cinema.SeatLocks[seat.Row][seat.Column]
+			seatLock.Lock()
+			seatLocks = append(seatLocks, seatLock)
 		}
-		lock := s.cs.SeatLocks[c.Row][c.Column]
-		lock.Lock()
-		locks = append(locks, lock)
-
-		seat := s.cs.Seats[c.Row][c.Column]
-		seat.Taken = false
-		seat.Group = 0
 	}
 
-	// Unlock all (có thể theo chiều ngược lại để chắc ăn)
-	for i := len(locks) - 1; i >= 0; i-- {
-		locks[i].Unlock()
+	defer func() {
+		for i := len(seatLocks) - 1; i >= 0; i-- {
+			seatLocks[i].RUnlock()
+		}
+	}()
+
+	//4. cancel
+	for _, seat := range seatsCancel {
+		if seat.Row < c.cinema.Rows && seat.Column < c.cinema.Cols {
+			seatValid := c.cinema.Seats[seat.Row][seat.Column]
+			seatValid.Taken = false
+			seatValid.Group = 0
+		}
 	}
 
 	return nil
@@ -185,19 +225,28 @@ func (s *cinemaServiceUsecase) CancelSeats(req request.CancelSeatRequest) error 
 
 // helpers
 
-func (s *cinemaServiceUsecase) validDistance(row, col int) bool {
-	for i := 0; i < s.cs.Rows; i++ {
-		for j := 0; j < s.cs.Cols; j++ {
-			seat := s.cs.Seats[i][j]
-			if seat.Taken && s.manhattan(seat.Row, seat.Column, row, col) < s.cs.MinDistance {
+func (c *cinemaServiceUsecase) validDistance(row, col int, bookingSet map[[2]int]bool) bool {
+	for i := 0; i < c.cinema.Rows; i++ {
+		for j := 0; j < c.cinema.Cols; j++ {
+
+			if bookingSet[[2]int{i, j}] {
+				continue
+			}
+
+			lock := c.cinema.SeatLocks[i][j]
+			lock.RLock()
+			seat := c.cinema.Seats[i][j]
+			taken := seat.Taken
+			lock.RUnlock()
+			if taken && c.manhattan(seat.Row, seat.Column, row, col) < c.cinema.MinDistance {
 				return false
 			}
 		}
 	}
+
 	return true
 }
-
-func (s *cinemaServiceUsecase) manhattan(x1, y1, x2, y2 int) int {
+func (c *cinemaServiceUsecase) manhattan(x1, y1, x2, y2 int) int {
 	return abs(x1-x2) + abs(y1-y2)
 }
 

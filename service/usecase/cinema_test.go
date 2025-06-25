@@ -89,7 +89,7 @@ func TestCinemaService_CheckAvailableSeats(t *testing.T) {
 		},
 	})
 
-	availableResp := svc.CheckAvailableSeats(request.CheckAvailableSeatRequest{
+	availableResp, _ := svc.CheckAvailableSeats(request.CheckAvailableSeatRequest{
 		Seats: []request.Seat{
 			{Row: 0, Column: 0}, {Row: 0, Column: 1},
 		},
