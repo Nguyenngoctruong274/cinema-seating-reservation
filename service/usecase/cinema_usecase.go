@@ -70,7 +70,7 @@ func (c *cinemaServiceUsecase) CheckAvailableSeats(req request.CheckAvailableSea
 	seatLocks := make([]*sync.RWMutex, 0, len(seatChecks))
 	mapSeatUnique := make(map[[2]int]bool)
 	for _, seat := range seatChecks {
-		if seat.Row >= c.cinema.Rows || seat.Column >= seat.Column {
+		if seat.Row >= c.cinema.Rows || seat.Column >= c.cinema.Cols {
 			return response.CheckAvailableSeatResp{}, fmt.Errorf("seat (%d,%d) out of bounds", seat.Row, seat.Column)
 		}
 		key := [2]int{seat.Row, seat.Row}
