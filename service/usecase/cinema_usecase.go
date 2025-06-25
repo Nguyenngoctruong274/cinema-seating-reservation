@@ -191,7 +191,7 @@ func (c *cinemaServiceUsecase) CancelSeats(req request.CancelSeatRequest) error 
 	//2.sort
 	sort.Slice(seatsCancel, func(i, j int) bool {
 		if seatsCancel[i].Row == seatsCancel[j].Row {
-			return seatsCancel[i].Column < seatsCancel[i].Column
+			return seatsCancel[i].Column < seatsCancel[j].Column
 		}
 		return seatsCancel[i].Row < seatsCancel[j].Row
 	})
@@ -207,7 +207,7 @@ func (c *cinemaServiceUsecase) CancelSeats(req request.CancelSeatRequest) error 
 
 	defer func() {
 		for i := len(seatLocks) - 1; i >= 0; i-- {
-			seatLocks[i].RUnlock()
+			seatLocks[i].Unlock()
 		}
 	}()
 
